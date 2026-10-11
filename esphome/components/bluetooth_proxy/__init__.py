@@ -67,6 +67,10 @@ CONF_CACHE_SERVICES = "cache_services"
 CONF_CONNECTIONS = "connections"
 DEFAULT_CONNECTION_SLOTS = 3
 
+# JK 2026-10-10
+# Constant for the string key used in YAML
+CONF_MAC_ADDRESS = "mac_address"
+
 bluetooth_proxy_ns = cg.esphome_ns.namespace("bluetooth_proxy")
 
 BluetoothProxy = bluetooth_proxy_ns.class_("BluetoothProxy", cg.Component)
@@ -131,6 +135,10 @@ def _esp32_config_schema() -> cv.All:
                         cv.ensure_list(CONNECTION_SCHEMA),
                         cv.Length(min=1, max=esp32_ble.IDF_MAX_CONNECTIONS),
                     ),
+                    # JK 2026-10-10
+                    # Optional, but if specified, a list of MAC addresses must be provided to act as a filter for establishing Gatt communication
+                    # Each element must conform to the format of a MAC address (cv.mac_address)
+                    cv.Optional(CONF_MAC_ADDRESS): cv.ensure_list(cv.mac_address),
                 }
             )
             .extend(esp32_ble_tracker.ESP_BLE_DEVICE_SCHEMA)
@@ -374,7 +382,11 @@ async def _to_code_esp32(config: ConfigType) -> None:
     cg.add(var.set_active(config[CONF_ACTIVE]))
     tracker = await cg.get_variable(config[esp32_ble_tracker.CONF_ESP32_BLE_ID])
     cg.add(var.set_ble_hub(tracker))
-
+    # JK 2026-10-10
+    # This is code generation. If MAC addresses are specified in the configuration, they are added here as a line of C++ code each.
+    if CONF_MAC_ADDRESS in config:
+        for mac in config[CONF_MAC_ADDRESS]:
+            cg.add(var.add_mac_address(mac))
     # Compiles the scanner-state push slot into the tracker and the matching
     # registration into the proxy; the other hubs are polled instead.
     cg.add_define("USE_BLE_SCANNER_STATE_CALLBACK")
