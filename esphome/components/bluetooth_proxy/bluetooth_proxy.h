@@ -17,6 +17,9 @@
 #include "esphome/components/ble_device_base/ble_hub_impl.h"
 
 #include "esphome/components/bluetooth_connection/bluetooth_connection_hub.h"
+// JK 2026-10-11: We need vector and string for implementing the MAC whitelist feature (called from Python code generator)
+#include <string>
+#include <vector>
 
 namespace esphome::bluetooth_proxy {
 
@@ -184,6 +187,9 @@ class BluetoothProxy final : public Component {
 
   void set_active(bool active) { this->active_ = active; }
   bool has_active() { return this->active_; }
+  /// JK 2026-10-11: Whitelist-Eintrag hinzufügen (vom Python-Codegenerator aufgerufen)
+  void add_mac_address(const std::string &mac);
+
 
 #ifdef USE_BLUETOOTH_PROXY_ADVERTISEMENT_FILTER
   /// One subscriber; a later call replaces an earlier one.
@@ -250,6 +256,11 @@ class BluetoothProxy final : public Component {
   }
 
  protected:
+  // JK 2026-10-11: MAC-Whitelist für die Bluetooth-Proxy-Komponente
+  /// Checks whether the given MAC address is in the whitelist. Returns true if it is, false otherwise.
+  /// empty whitelist means all MAC addresses are allowed.
+  bool is_mac_whitelisted_(uint64_t address) const;
+
   bool send_bluetooth_scanner_state_(ble_device_base::ScannerState state);
 #ifdef USE_BLE_SCANNER_STATE_CALLBACK
   void send_scanner_state_(ble_device_base::ScannerState state);
@@ -340,6 +351,9 @@ class BluetoothProxy final : public Component {
   // Memory optimized layout for 32-bit systems
   // Group 1: Pointers (4 bytes each, naturally aligned)
   api::APIConnection *api_connection_{nullptr};
+
+  // JK 2026-10-11: MAC-Whitelist for the Bluetooth Proxy component. If empty, all MAC addresses are allowed.
+  std::vector<uint64_t> mac_whitelist_;
 
 #ifdef USE_BLUETOOTH_PROXY_CONNECTIONS
   // Group 2: Fixed-size array of connection pointers

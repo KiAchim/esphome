@@ -11,7 +11,7 @@
 #include <cinttypes>
 #include <cstring>
 #include <limits>
-
+#include <cstdlib>
 namespace esphome::bluetooth_proxy {
 
 ESPHOME_LOG_TAG(TAG, "bluetooth_proxy");
@@ -331,6 +331,13 @@ void BluetoothProxy::bluetooth_device_request(const api::BluetoothDeviceRequest 
   switch (msg.request_type) {
     case api::enums::BLUETOOTH_DEVICE_REQUEST_TYPE_CONNECT_V3_WITH_CACHE:
     case api::enums::BLUETOOTH_DEVICE_REQUEST_TYPE_CONNECT_V3_WITHOUT_CACHE: {
+      // JK 2026-10-11: Check if the MAC address is in the whitelist. If not, reject the connection request.
+      if (!this->is_mac_whitelisted_(msg.address)) {
+        ESP_LOGD(TAG, "Connection rejected: MAC %012llX not in whitelist",
+                 (unsigned long long) msg.address);
+        this->answer_device_disconnected_(msg.address);
+        return;
+      }
       auto *connection = this->get_connection_(msg.address, true);
       if (connection == nullptr) {
         ESP_LOGW(TAG, "No free connections available");
@@ -884,6 +891,40 @@ void BluetoothProxy::send_device_clear_cache(uint64_t address, bool success, con
 
 BluetoothProxy *global_bluetooth_proxy = nullptr;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
+// JK 2026-10-11: Add Whitelist-Entry for MAC-Address. This is used to filter out unwanted devices.
+/// @brief
+///     Adds a MAC-Address to the Whitelist.
+/// @param mac the mac-Address to be added (as string, e.g. "12:34:56:AB:CD:EF")
+void BluetoothProxy::add_mac_address(const std::string &mac) {
+  // ':' to be removed : "12:34:56:AB:CD:EF" -> "123456ABCDEF"
+  std::string hex;
+  hex.reserve(mac.size());
+  for (char c : mac) {
+    if (c != ':') hex.push_back(c);
+  }
+  uint64_t address = std::strtoull(hex.c_str(), nullptr, 16);
+  this->mac_whitelist_.push_back(address);
+  ESP_LOGI(TAG, "MAC whitelist entry added: %s (0x%012llX)", mac.c_str(), (unsigned long long) address);
+}
+/// JK 2026-10-11: Check MAC-Address against Whitelist. If the Whitelist is empty, all MAC-Addresses are allowed.
+/// @brief
+///    Checks if the given MAC-Address is in the Whitelist. If the Whitelist is empty, all MAC-Addresses are allowed.
+/// @param address the MAC-Address to check (as uint64_t)
+/// @return true if the MAC-Address is in the Whitelist or if the Whitelist is empty, false otherwise.
+bool BluetoothProxy::is_mac_whitelisted_(uint64_t address) const {
+  // Keine Whitelist konfiguriert: alles erlauben (Rückwärtskompatibilität).
+  if (this->mac_whitelist_.empty()) {
+    return true;
+  }
+  for (uint64_t entry : this->mac_whitelist_) {
+    if (entry == address) {
+      return true;
+    }
+  }
+  return false;
+}
 }  // namespace esphome::bluetooth_proxy
+
+
 
 #endif  // USE_BLUETOOTH_PROXY

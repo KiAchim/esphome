@@ -386,7 +386,7 @@ async def _to_code_esp32(config: ConfigType) -> None:
     # This is code generation. If MAC addresses are specified in the configuration, they are added here as a line of C++ code each.
     if CONF_MAC_ADDRESS in config:
         for mac in config[CONF_MAC_ADDRESS]:
-            cg.add(var.add_mac_address(mac))
+            cg.add(var.add_mac_address(str(mac)))
     # Compiles the scanner-state push slot into the tracker and the matching
     # registration into the proxy; the other hubs are polled instead.
     cg.add_define("USE_BLE_SCANNER_STATE_CALLBACK")
