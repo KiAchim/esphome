@@ -333,7 +333,7 @@ void BluetoothProxy::bluetooth_device_request(const api::BluetoothDeviceRequest 
     case api::enums::BLUETOOTH_DEVICE_REQUEST_TYPE_CONNECT_V3_WITHOUT_CACHE: {
       // JK 2026-10-11: Check if the MAC address is in the whitelist. If not, reject the connection request.
       if (!this->is_mac_whitelisted_(msg.address)) {
-        ESP_LOGD(TAG, "Connection rejected: MAC %012llX not in whitelist",
+        ESP_LOGI(TAG, "Connection rejected: MAC %012llX not in whitelist",
                  (unsigned long long) msg.address);
         this->answer_device_disconnected_(msg.address);
         return;
